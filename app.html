@@ -4320,7 +4320,7 @@ function mostrarCupomNaTela(vendaId, tipo) {
     tamanho: 'large',
     textoConfirm: '🖨 Imprimir Cupom',
     onConfirm: () => {
-      try { enviarParaImpressao(vendaId, tipo); } catch(e) { toast('Erro ao imprimir: ' + e.message, 'error'); }
+      try { enviarParaImpressao(vendaId, tipo, true); } catch(e) { toast('Erro ao imprimir: ' + e.message, 'error'); }
       fecharModal();
     }
   });
@@ -4386,20 +4386,22 @@ function _classificarVenda(venda) {
 // conforme a classificação da venda e as configurações salvas.
 function _getPlanoImpressao(vendaId) {
   const venda = query("SELECT * FROM vendas WHERE id=?", [vendaId])[0];
-  if (!venda) return { vias: 1, classe: 'vista' };
+  if (!venda) return { enabled: true, vias: 1, classe: 'vista' };
   const classe = _classificarVenda(venda);
-  let vias = 1;
+  // "enabled" = impressao AUTOMATICA da categoria ligada; "vias" = nro de copias
+  // (sempre calculado, para a impressao manual respeitar o nro configurado).
+  let enabled = true, vias = 1;
   if (classe === 'vista') {
-    if (getConfig('cfgImpVendaVista', '1') !== '1') return { vias: 0, classe };
-    vias = parseInt(getConfig('cfgViasVista', '2'), 10) || 1;
+    enabled = getConfig('cfgImpVendaVista', '1') === '1';
+    vias = parseInt(getConfig('cfgViasVista', '1'), 10) || 1;
   } else if (classe === 'prazo') {
-    if (getConfig('cfgImpVendaPrazo', '1') !== '1') return { vias: 0, classe };
+    enabled = getConfig('cfgImpVendaPrazo', '1') === '1';
     vias = 1 + (getConfig('cfgViaClientePrazo', '1') === '1' ? 1 : 0);
   } else if (classe === 'parcelamento') {
-    if (getConfig('cfgImpParcelamento', '1') !== '1') return { vias: 0, classe };
+    enabled = getConfig('cfgImpParcelamento', '1') === '1';
     vias = 1 + (getConfig('cfgViaClienteParcel', '1') === '1' ? 1 : 0);
   }
-  return { vias, classe };
+  return { enabled, vias, classe };
 }
 
 // Imprime cupons/recibos via iframe oculto. O WebView do Tauri bloqueia
@@ -4407,11 +4409,15 @@ function _getPlanoImpressao(vendaId) {
 // cupom de sair. O iframe usa o mesmo mecanismo ja usado em imprimirRelatorio().
 function _imprimirViaIframe(titulo, corpoHtml) {
   const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:80mm;height:auto;border:none;';
+  const _pw = getConfig('cfg_paper_width', '80mm');
+  const _cfg = _pw === '58mm' ? { frame:'58mm', cupom:'180px', page:'58mm auto', margin:'0' }
+             : _pw === 'A4'   ? { frame:'210mm', cupom:'100%', page:'A4', margin:'10mm' }
+             :                  { frame:'80mm', cupom:'320px', page:'80mm auto', margin:'0' };
+  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:' + _cfg.frame + ';height:auto;border:none;';
   document.body.appendChild(iframe);
   const doc = iframe.contentDocument || iframe.contentWindow.document;
-  const css = `@page{size:auto;margin:0}body{margin:0;padding:10px}`
-    + `.cupom-receipt{width:320px;max-width:320px;margin:0 auto;font-family:"Courier New",monospace;font-size:12px;color:#000;background:#fff;padding:16px 14px;box-sizing:border-box}`
+  const css = `@page{size:${_cfg.page};margin:${_cfg.margin}}body{margin:0;padding:10px}`
+    + `.cupom-receipt{width:${_cfg.cupom};max-width:${_cfg.cupom};margin:0 auto;font-family:"Courier New",monospace;font-size:12px;color:#000;background:#fff;padding:16px 14px;box-sizing:border-box}`
     + `.cupom-receipt table{width:100%;border-collapse:collapse;table-layout:fixed;border:none}`
     + `.cupom-receipt td,.cupom-receipt th{border:none;background:transparent;font-family:inherit;font-size:inherit;color:inherit;padding:1px 0;vertical-align:top}`
     + `.cupom-receipt .cc{text-align:center}.cupom-receipt .cr{text-align:right}.cupom-receipt .cl{text-align:left}.cupom-receipt .cb{font-weight:bold}`
@@ -4438,9 +4444,9 @@ function _imprimirViaIframe(titulo, corpoHtml) {
 
 // Envia o cupom para a impressora (abre janela de impressão do navegador).
 // Respeita a configuração de "vias" conforme a classificação da venda.
-function enviarParaImpressao(vendaId, tipo) {
+function enviarParaImpressao(vendaId, tipo, forcar = false) {
   const plano = _getPlanoImpressao(vendaId);
-  if (plano.vias <= 0) { return; } // operador desativou essa categoria de impressão
+  if (!forcar && !plano.enabled) { return; } // operador desativou essa categoria de impressão
   const { html, numero } = montarHTMLCupom(vendaId, tipo);
   const vias = Math.max(1, Math.min(5, plano.vias));
   // Monta o corpo com N cópias separadas por quebra de página
