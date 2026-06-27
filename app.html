@@ -4402,6 +4402,40 @@ function _getPlanoImpressao(vendaId) {
   return { vias, classe };
 }
 
+// Imprime cupons/recibos via iframe oculto. O WebView do Tauri bloqueia
+// window.open (pop-up), o que impedia a janela de impressao de abrir e o
+// cupom de sair. O iframe usa o mesmo mecanismo ja usado em imprimirRelatorio().
+function _imprimirViaIframe(titulo, corpoHtml) {
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:80mm;height:auto;border:none;';
+  document.body.appendChild(iframe);
+  const doc = iframe.contentDocument || iframe.contentWindow.document;
+  const css = `@page{size:auto;margin:0}body{margin:0;padding:10px}`
+    + `.cupom-receipt{width:320px;max-width:320px;margin:0 auto;font-family:"Courier New",monospace;font-size:12px;color:#000;background:#fff;padding:16px 14px;box-sizing:border-box}`
+    + `.cupom-receipt table{width:100%;border-collapse:collapse;table-layout:fixed;border:none}`
+    + `.cupom-receipt td,.cupom-receipt th{border:none;background:transparent;font-family:inherit;font-size:inherit;color:inherit;padding:1px 0;vertical-align:top}`
+    + `.cupom-receipt .cc{text-align:center}.cupom-receipt .cr{text-align:right}.cupom-receipt .cl{text-align:left}.cupom-receipt .cb{font-weight:bold}`
+    + `.cupom-receipt .csep td{padding:0;line-height:0;font-size:0}`
+    + `.cupom-receipt .csep-div{border-top:1px dashed #555;margin:5px 0;height:0}`
+    + `.cupom-receipt .csep-solid{border-top:1px solid #aaa;margin:2px 0;height:0}`
+    + `.cupom-receipt .ctotal td{font-weight:bold;font-size:14px}`
+    + `.cupom-receipt .citem-vals td{font-size:11px}`
+    + `.cupom-receipt .cheader-title td{font-weight:bold;font-size:14px}`
+    + `.cupom-receipt .ctitle td{font-weight:bold;letter-spacing:1px}`;
+  doc.open();
+  doc.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + (titulo || 'Cupom') + '</title>');
+  doc.write('<style>' + css + '</style>');
+  doc.write('</head><body>');
+  doc.write(corpoHtml);
+  doc.write('</body></html>');
+  doc.close();
+  setTimeout(() => {
+    try { iframe.contentWindow.focus(); iframe.contentWindow.print(); }
+    catch (e) { console.error('Falha ao imprimir cupom:', e); toast('Falha ao abrir a impressao: ' + e.message, 'error'); }
+    setTimeout(() => { try { document.body.removeChild(iframe); } catch (_) {} }, 2000);
+  }, 400);
+}
+
 // Envia o cupom para a impressora (abre janela de impressão do navegador).
 // Respeita a configuração de "vias" conforme a classificação da venda.
 function enviarParaImpressao(vendaId, tipo) {
@@ -4417,12 +4451,7 @@ function enviarParaImpressao(vendaId, tipo) {
       : (plano.classe === 'vista' && vias > 1 ? `<div style="text-align:center;font-size:10px;margin:3px 0">-- Via ${i+1}/${vias} --</div>` : '');
     corpo += sel + html + '<div style="page-break-after:always"></div>';
   }
-  const w = window.open('', '_blank', 'width=400,height=600');
-  w.document.write('<html><head><title>Cupom - ' + numero + '</title></head><body style="margin:0;padding:10px">');
-  w.document.write(corpo);
-  w.document.write('<scr' + 'ipt>setTimeout(function(){window.print();},300);<' + '/script>');
-  w.document.write('</body></html>');
-  w.document.close();
+  _imprimirViaIframe('Cupom - ' + numero, corpo);
 }
 
 // Imprime um cupom de RECEBIMENTO DE CREDIÁRIO (quando uma conta a receber
@@ -4477,13 +4506,7 @@ function _imprimirReciboRecebimento(contaId, titulo, vias) {
       : '';
     corpo += tag + html + '<div style="page-break-after:always"></div>';
   }
-  const w = window.open('', '_blank', 'width=400,height=600');
-  if (!w) return;
-  w.document.write('<html><head><title>Recibo</title></head><body style="margin:0;padding:10px">');
-  w.document.write(corpo);
-  w.document.write('<scr' + 'ipt>setTimeout(function(){window.print();},300);<' + '/script>');
-  w.document.write('</body></html>');
-  w.document.close();
+  _imprimirViaIframe('Recibo', corpo);
 }
 
 // Função antiga mantida como alias para compatibilidade (reimpressão no histórico)
