@@ -4444,7 +4444,208 @@ function _imprimirViaIframe(titulo, corpoHtml) {
 
 // Envia o cupom para a impressora (abre janela de impressão do navegador).
 // Respeita a configuração de "vias" conforme a classificação da venda.
+
+// ===== Impressao nativa (Tauri/Windows) - ESC/POS direto na impressora =====
+// Estas funcoes fazem o cupom sair na impressora SELECIONADA no modulo de
+// Configuracoes de Impressora (sem dialogo do Windows), respeitando a largura
+// do papel (58/80mm), o numero de vias e a abertura de gaveta. No navegador
+// (sem Tauri), cai automaticamente no fallback _imprimirCupomDialogo().
+function _pdvIsTauri() {
+  return !!(window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke);
+}
+function _pdvInvoke(cmd, args) {
+  if (!_pdvIsTauri()) return Promise.reject('Tauri indisponivel');
+  return window.__TAURI_INTERNALS__.invoke(cmd, args || {});
+}
+
+// Mapa Unicode -> byte CP850 (impressoras termicas Epson-compativeis).
+var _CP850 = (function () {
+  var m = {};
+  var pairs = [
+    [0xE0,0x85],[0xE1,0xA0],[0xE2,0x83],[0xE3,0xC6],[0xE4,0x84],
+    [0xE8,0x8A],[0xE9,0x82],[0xEA,0x88],[0xEB,0x89],
+    [0xEC,0x8D],[0xED,0xA1],[0xEE,0x8C],[0xEF,0x8B],
+    [0xF2,0x95],[0xF3,0xA2],[0xF4,0x93],[0xF5,0xE4],[0xF6,0x94],
+    [0xF9,0x97],[0xFA,0xA3],[0xFB,0x96],[0xFC,0x81],
+    [0xE7,0x87],[0xC7,0x80],[0xF1,0xA4],[0xD1,0xA5],
+    [0xC1,0xB5],[0xC2,0xB6],[0xC0,0xB7],[0xC3,0xC7],[0xC4,0x8E],
+    [0xC9,0x90],[0xCA,0xD2],[0xC8,0xD4],[0xCB,0xD3],
+    [0xCD,0xD6],[0xCE,0xD7],[0xCC,0xDE],[0xCF,0xD8],
+    [0xD3,0xE0],[0xD4,0xE2],[0xD2,0xE3],[0xD5,0xE5],[0xD6,0x99],
+    [0xDA,0xE9],[0xDB,0xEA],[0xD9,0xEB],[0xDC,0x9A],
+    [0xBA,0xA7],[0xAA,0xA6],[0xB0,0xF8]
+  ];
+  for (var i = 0; i < pairs.length; i++) m[String.fromCharCode(pairs[i][0])] = pairs[i][1];
+  return m;
+})();
+var _ASCIIFALL = (function () {
+  var m = {};
+  var groups = [
+    ['a',[0xE0,0xE1,0xE2,0xE3,0xE4,0xC0,0xC1,0xC2,0xC3,0xC4]],
+    ['e',[0xE8,0xE9,0xEA,0xEB,0xC8,0xC9,0xCA,0xCB]],
+    ['i',[0xEC,0xED,0xEE,0xEF,0xCC,0xCD,0xCE,0xCF]],
+    ['o',[0xF2,0xF3,0xF4,0xF5,0xF6,0xD2,0xD3,0xD4,0xD5,0xD6]],
+    ['u',[0xF9,0xFA,0xFB,0xFC,0xD9,0xDA,0xDB,0xDC]],
+    ['c',[0xE7]],['C',[0xC7]],['n',[0xF1]],['N',[0xD1]]
+  ];
+  for (var g = 0; g < groups.length; g++) {
+    var ch = groups[g][0], arr = groups[g][1];
+    for (var i = 0; i < arr.length; i++) m[String.fromCharCode(arr[i])] = ch.charCodeAt(0);
+  }
+  return m;
+})();
+function _encCp850(s) {
+  s = String(s == null ? '' : s);
+  var out = [];
+  for (var i = 0; i < s.length; i++) {
+    var c = s.charCodeAt(i);
+    if (c < 0x80) { out.push(c); continue; }
+    var ch = s.charAt(i);
+    if (_CP850[ch] != null) out.push(_CP850[ch]);
+    else if (_ASCIIFALL[ch] != null) out.push(_ASCIIFALL[ch]);
+    else out.push(0x3F);
+  }
+  return out;
+}
+
+// Monta os bytes ESC/POS do cupom (com N vias e, opcionalmente, gaveta).
+function _escposCupom(vendaId, tipo, cols, vias, classe, abre) {
+  var v = query("SELECT * FROM vendas WHERE id=?", [vendaId])[0];
+  if (!v) return [];
+  var itens = query("SELECT * FROM venda_itens WHERE venda_id=?", [vendaId]);
+  var cliente = v.cliente_id ? query("SELECT * FROM clientes WHERE id=?", [v.cliente_id])[0] : null;
+  var operador = query("SELECT nome FROM usuarios WHERE id=?", [v.usuario_id])[0];
+  var emp = query("SELECT * FROM empresa WHERE id=1")[0] || {};
+  var fiscal = (tipo === 'fiscal');
+
+  var ESC = 0x1B, GS = 0x1D, LF = 0x0A;
+  var out = [];
+  function raw() { for (var i = 0; i < arguments.length; i++) out.push(arguments[i] & 0xFF); }
+  function align(n) { raw(ESC, 0x61, n); }
+  function bold(on) { raw(ESC, 0x45, on ? 1 : 0); }
+  function text(s) { var b = _encCp850(s); for (var i = 0; i < b.length; i++) out.push(b[i]); }
+  function ln(s) { text(s); raw(LF); }
+  function feed(n) { for (var i = 0; i < n; i++) raw(LF); }
+  function rule() { ln(new Array(cols + 1).join('-')); }
+  function clip(s, n) { s = String(s); return s.length > n ? s.substring(0, n) : s; }
+  function lr(l, r) {
+    l = String(l); r = String(r);
+    if (l.length + r.length + 1 > cols) l = clip(l, Math.max(0, cols - r.length - 1));
+    var space = cols - l.length - r.length;
+    if (space < 1) space = 1;
+    return l + new Array(space + 1).join(' ') + r;
+  }
+
+  raw(ESC, 0x40);        // inicializa
+  raw(ESC, 0x74, 0x02);  // pagina de codigo CP850
+
+  for (var via = 0; via < vias; via++) {
+    align(1);
+    bold(true); ln(clip(emp.razao_social || 'Sua Empresa', cols)); bold(false);
+    if (emp.nome_fantasia) ln(clip(emp.nome_fantasia, cols));
+    if (emp.cnpj) ln('CNPJ: ' + emp.cnpj);
+    if (emp.ie) ln('IE: ' + emp.ie);
+    if (emp.endereco) ln(clip(emp.endereco, cols));
+    if (emp.telefone) ln('Tel: ' + emp.telefone);
+    align(0); rule();
+    align(1); bold(true); ln(fiscal ? 'CUPOM FISCAL' : 'CUPOM NAO FISCAL'); bold(false);
+    if (!fiscal) ln('Documento sem valor fiscal');
+    align(0); rule();
+    ln('No: ' + v.numero);
+    ln('Data: ' + formatarData(v.data));
+    ln('Operador: ' + (operador ? operador.nome : '-'));
+    if (cliente) { ln('Cliente: ' + clip(cliente.nome, cols - 9));
+      if (cliente.cpf_cnpj) ln('CPF/CNPJ: ' + cliente.cpf_cnpj); }
+    else ln('Cliente: CONSUMIDOR');
+    rule();
+    ln(lr('ITEM', 'TOTAL'));
+    rule();
+    itens.forEach(function (i) {
+      ln(clip(i.produto_nome, cols));
+      var qtd = String(i.quantidade);
+      var unit = Number(i.preco_unitario).toFixed(2);
+      var total = Number(i.subtotal).toFixed(2);
+      ln(lr('  ' + qtd + ' x ' + unit, total));
+    });
+    rule();
+    ln(lr('Subtotal:', formatarMoeda(v.subtotal)));
+    if (v.desconto > 0) ln(lr('Desconto:', '-' + formatarMoeda(v.desconto)));
+    bold(true); ln(lr('TOTAL:', formatarMoeda(v.total))); bold(false);
+    rule();
+    ln('Pagamento: ' + v.forma_pagamento);
+    if (v.observacoes && /Recebido:/.test(v.observacoes)) {
+      var mR = v.observacoes.match(/Recebido:\s*([^|]+)/);
+      var mT = v.observacoes.match(/Troco:\s*(.+)$/);
+      if (mR) ln(lr('Recebido:', mR[1].trim()));
+      if (mT) { bold(true); ln(lr('TROCO:', mT[1].trim())); bold(false); }
+    }
+    rule();
+    align(1);
+    if (classe !== 'vista' && via === vias - 1 && vias > 1) { bold(true); ln('*** VIA DO CLIENTE ***'); bold(false); }
+    else if (classe === 'vista' && vias > 1) ln('-- Via ' + (via + 1) + '/' + vias + ' --');
+    ln(clip(emp.rodape || 'Obrigado pela preferencia!', cols));
+    if (fiscal) ln('* Emitido via System PDV PRO *');
+    align(0);
+    feed(3);
+    raw(GS, 0x56, 0x01);  // corte parcial
+  }
+  if (abre) raw(ESC, 0x70, 0x00, 0x19, 0xFA);  // pulso de gaveta
+  return out;
+}
+
+function _imprimirCupomNativo(vendaId, tipo, vias, classe, pw, printer, abre) {
+  var cols = (pw === '58mm') ? 32 : 48;
+  var bytes = _escposCupom(vendaId, tipo, cols, vias, classe, abre);
+  if (!bytes.length) return Promise.reject('cupom vazio');
+  return _pdvInvoke('print_raw', { printer: printer, data: bytes });
+}
+
+// Carrega as impressoras reais instaladas no Windows (uma vez) e mescla na
+// lista do dropdown, persistindo-as.
+var _impressorasReaisCarregadas = false;
+function _carregarImpressorasReais() {
+  if (_impressorasReaisCarregadas || !_pdvIsTauri()) return;
+  _impressorasReaisCarregadas = true;
+  _pdvInvoke('list_printers').then(function (reais) {
+    if (!Array.isArray(reais) || !reais.length) return;
+    var salvas = _getImpressorasSalvas();
+    var changed = false;
+    reais.forEach(function (n) {
+      if (n && salvas.indexOf(n) < 0 && IMPRESSORAS_PADRAO.indexOf(n) < 0) { salvas.push(n); changed = true; }
+    });
+    if (changed) _setImpressorasSalvas(salvas);
+    preencherDropdownImpressoras();
+  }).catch(function (e) { console.warn('list_printers:', e); });
+}
+
+// Ponto de entrada de impressao do cupom de venda. Usa impressao nativa quando
+// rodando no desktop (Tauri) com impressora selecionada e papel termico;
+// senao, usa o dialogo (iframe) como antes.
 function enviarParaImpressao(vendaId, tipo, forcar = false) {
+  var plano = _getPlanoImpressao(vendaId);
+  var pw = getConfig('cfg_paper_width', '80mm');
+  var printer = getConfig('cfg_printer_name', '');
+  var abre = getConfig('cfg_abre_gaveta', 'nao') === 'sim';
+  var ehTermica = (pw === '58mm' || pw === '80mm');
+
+  if (_pdvIsTauri() && printer && ehTermica) {
+    if (!forcar && !plano.enabled) {
+      if (abre) _pdvInvoke('open_drawer', { printer: printer }).catch(function (e) { console.warn('open_drawer:', e); });
+      return;
+    }
+    var vias = Math.max(1, Math.min(5, plano.vias));
+    _imprimirCupomNativo(vendaId, tipo, vias, plano.classe, pw, printer, abre)
+      .catch(function (e) {
+        console.error('Impressao nativa falhou:', e);
+        toast('Falha na impressao nativa (' + e + '). Usando dialogo do Windows.', 'warning');
+        _imprimirCupomDialogo(vendaId, tipo, forcar);
+      });
+    return;
+  }
+  _imprimirCupomDialogo(vendaId, tipo, forcar);
+}
+
+function _imprimirCupomDialogo(vendaId, tipo, forcar = false) {
   const plano = _getPlanoImpressao(vendaId);
   if (!forcar && !plano.enabled) { return; } // operador desativou essa categoria de impressão
   const { html, numero } = montarHTMLCupom(vendaId, tipo);
@@ -7155,6 +7356,7 @@ function preencherDropdownImpressoras() {
     html += `<option value="${atual.replace(/"/g,'&quot;')}" selected>${atual}</option>`;
   }
   sel.innerHTML = html;
+  _carregarImpressorasReais();
 }
 
 function adicionarImpressoraSalva() {

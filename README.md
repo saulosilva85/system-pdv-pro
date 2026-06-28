@@ -48,9 +48,10 @@ usuários/perfis e backup. Funciona como **aplicativo desktop Windows**
 | `index.html`, `app.html` | Front-end do sistema (inalterados). |
 | `server/` | Servidor de rede Node + `better-sqlite3` (API + WebSocket). |
 | `server/schema.js` | Schema do banco + seeds (espelha `criarEstrutura()` do `app.html`). |
-| `src-tauri/` | App desktop Tauri 2 (Rust): persiste config e inicia o servidor embutido. |
+| `src-tauri/` | App desktop Tauri 2 (Rust): persiste config, inicia o servidor embutido e faz a **impressão nativa** (cupom + gaveta). |
+| `src-tauri/src/printing.rs` | Impressão ESC/POS via spooler do Windows (RAW): lista impressoras, imprime e aciona a gaveta. |
 | `scripts/build-frontend.js` | Copia `index.html`/`app.html` para `dist/` (empacotado no app). |
-| `.github/workflows/build-windows.yml` | CI que gera o instalador Windows `.exe`. |
+| `ci/build-windows.yml` | CI que gera o instalador Windows `.exe` (copie para `.github/workflows/`). |
 
 ---
 
@@ -154,6 +155,34 @@ npm run dev          # Tauri dev; usa o `node` do PATH e ../server/server.js
 
 > Há também um usuário administrativo interno do desenvolvedor. **Troque/relmova
 > as credenciais padrão antes de comercializar.**
+
+---
+
+## Impressão de cupom e gaveta
+
+No **app desktop (Windows)** a impressão é **nativa**: o cupom sai direto na
+impressora escolhida, sem o diálogo do Windows, respeitando todo o módulo
+*Configurações de Impressora*.
+
+- **Selecionar Impressora:** o seletor é preenchido automaticamente com as
+  impressoras instaladas no Windows (comando `list_printers`). Basta escolher.
+- **Largura do Papel:** `58 mm` → 32 colunas, `80 mm` → 48 colunas.
+  (`A4` continua usando o diálogo do navegador.)
+- **Vias / Recibos automáticos:** imprime o número de vias configurado por
+  categoria (à vista / prazo / parcelamento), com corte parcial entre elas.
+- **Abertura Automática da Gaveta:** quando `Sim`, envia o pulso ESC/POS
+  (`ESC p 0 25 250`) junto com o cupom (ou sozinho, se a impressão da
+  categoria estiver desligada).
+- **Acentuação:** o texto é codificado em **CP850** (`ESC t 2`); caracteres
+  fora da tabela caem para ASCII sem acento, nunca quebrando a impressão.
+
+No **navegador** (sem Tauri) ou com papel **A4**, mantém-se o fluxo anterior
+(diálogo de impressão via iframe), também respeitando vias e largura.
+
+> Comandos Tauri usados: `list_printers`, `print_raw(printer, data)` e
+> `open_drawer(printer)` — implementados em `src-tauri/src/printing.rs`.
+> A maioria das impressoras térmicas é compatível com ESC/POS; se a sua usar
+> outra tabela de código/gaveta, ajuste em `printing.rs` / `_escposCupom`.
 
 ---
 

@@ -13,6 +13,8 @@ use std::sync::Mutex;
 use serde_json::{Map, Value};
 use tauri::{AppHandle, Manager, State};
 
+mod printing;
+
 const SERVER_PORT: &str = "8765";
 
 #[derive(Default)]
@@ -218,6 +220,21 @@ fn start_embedded_server(app: AppHandle, state: State<ServerState>) -> Result<()
 }
 
 #[tauri::command]
+fn list_printers() -> Result<Vec<String>, String> {
+    printing::imp::list_printers()
+}
+
+#[tauri::command]
+fn print_raw(printer: String, data: Vec<u8>) -> Result<(), String> {
+    printing::imp::print_raw(&printer, &data)
+}
+
+#[tauri::command]
+fn open_drawer(printer: String) -> Result<(), String> {
+    printing::imp::open_drawer(&printer)
+}
+
+#[tauri::command]
 fn read_server_log_tail(app: AppHandle) -> String {
     let p = log_path(&app);
     let file = match fs::File::open(&p) {
@@ -240,7 +257,10 @@ pub fn run() {
             ensure_identificador,
             hostname,
             start_embedded_server,
-            read_server_log_tail
+            read_server_log_tail,
+            list_printers,
+            print_raw,
+            open_drawer
         ])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar o System PDV PRO");
