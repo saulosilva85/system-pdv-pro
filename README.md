@@ -66,6 +66,11 @@ System PDV PRO_2.0.0_x64-setup.exe
 
 Não é preciso ter Windows à mão: o build roda na nuvem.
 
+> **Antes do primeiro uso:** copie o arquivo `ci/build-windows.yml` para
+> `.github/workflows/build-windows.yml` e faça commit. (O workflow vem em
+> `ci/` porque a automação não tem permissão para criar arquivos em
+> `.github/workflows/` por você — basta mover uma vez.)
+
 1. Faça `push` para o GitHub (qualquer branch) **ou** dispare manualmente o
    workflow **Build Windows Installer** na aba *Actions*.
 2. Ao terminar, baixe o artefato **`System-PDV-PRO-setup`** — ele contém o
