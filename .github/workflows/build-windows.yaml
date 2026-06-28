@@ -59,7 +59,7 @@ jobs:
           Copy-Item server/package.json "$res/server/package.json" -Force
           Copy-Item server/node_modules "$res/server/node_modules" -Recurse -Force
 
-          Write-Host "Conteudo de $res:"
+          Write-Host "Conteudo de ${res:}"
           Get-ChildItem $res -Recurse -Depth 1 | Select-Object FullName
 
       - name: Build Tauri (NSIS installer)
