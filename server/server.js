@@ -41,10 +41,18 @@ function log(...args) {
 }
 
 // --------------------------- Banco de dados ---------------------------
-const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = OFF');
-inicializarSchema(db);
+function openDatabase() {
+  const d = new Database(DB_PATH);
+  d.pragma('journal_mode = WAL');
+  d.pragma('foreign_keys = OFF');
+  inicializarSchema(d);
+  return d;
+}
+
+// `let` (nao `const`): o restore reabre o banco no mesmo processo,
+// reatribuindo esta variavel. Todas as rotas referenciam `db` por nome,
+// entao passam a usar a nova conexao automaticamente.
+let db = openDatabase();
 log('Banco pronto em', DB_PATH);
 
 // better-sqlite3 nao aceita undefined nem boolean como parametro de bind.
@@ -188,13 +196,23 @@ app.post('/api/backup/restore', express.raw({ type: '*/*', limit: '200mb' }), (r
     const test = new Database(tmp, { readonly: true });
     test.prepare('SELECT COUNT(*) FROM sqlite_master').get();
     test.close();
+    // Fecha a conexao atual e remove os arquivos WAL/SHM do banco antigo —
+    // se ficassem no disco, o SQLite tentaria reaplica-los sobre o banco
+    // restaurado, "desfazendo" parte da restauracao.
     db.close();
+    for (const ext of ['-wal', '-shm']) {
+      try { fs.unlinkSync(DB_PATH + ext); } catch (_) {}
+    }
     fs.copyFileSync(tmp, DB_PATH);
     fs.unlinkSync(tmp);
+    // Reabre o banco no MESMO processo (sem matar o servidor). Antes o
+    // servidor fazia process.exit(0) esperando um supervisor reinicia-lo,
+    // mas no app desktop (Tauri) o processo Node nao era respawnado, o que
+    // derrubava o servidor e impedia o login apos restaurar um backup.
+    db = openDatabase();
     broadcast({ type: 'restore' });
-    res.json({ ok: true, restart: true });
-    log('Backup restaurado — reiniciando processo para reabrir o banco.');
-    setTimeout(() => process.exit(0), 300);
+    res.json({ ok: true, restart: false });
+    log('Backup restaurado — banco reaberto no mesmo processo.');
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

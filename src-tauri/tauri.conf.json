@@ -39,7 +39,7 @@
     "resources": ["resources/**/*"],
     "windows": {
       "nsis": {
-        "installMode": "currentUser",
+        "installMode": "perMachine",
         "languages": ["PortugueseBR", "English"]
       }
     }
