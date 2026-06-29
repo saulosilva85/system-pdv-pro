@@ -19,6 +19,8 @@
         "minHeight": 700,
         "resizable": true,
         "maximized": true,
+        "visible": true,
+        "focus": true,
         "center": true
       }
     ],
@@ -40,7 +42,8 @@
     "windows": {
       "nsis": {
         "installMode": "perMachine",
-        "languages": ["PortugueseBR", "English"]
+        "languages": ["PortugueseBR", "English"],
+        "installerHooks": "installer-hooks.nsh"
       }
     }
   },

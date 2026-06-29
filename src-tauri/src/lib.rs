@@ -247,10 +247,36 @@ fn read_server_log_tail(app: AppHandle) -> String {
     lines[start..].join("\n")
 }
 
+// Encerra o servidor Node embutido (se vivo). Chamado ao sair do app para
+// nao deixar um node.exe orfao travando arquivos na pasta de instalacao —
+// o que impedia o desinstalador de remover a pasta e quebrava a reinstalacao.
+fn kill_embedded_server(app: &AppHandle) {
+    if let Some(state) = app.try_state::<ServerState>() {
+        if let Ok(mut guard) = state.child.lock() {
+            if let Some(mut child) = guard.take() {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .manage(ServerState::default())
+        .setup(|app| {
+            // Garante que a janela principal abra visivel, restaurada (nao
+            // minimizada), maximizada e em foco — ao ser iniciada pela tela
+            // final do instalador ela vinha minimizada/sem foco.
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.unminimize();
+                let _ = win.show();
+                let _ = win.maximize();
+                let _ = win.set_focus();
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             get_config,
             save_config,
@@ -262,6 +288,11 @@ pub fn run() {
             print_raw,
             open_drawer
         ])
-        .run(tauri::generate_context!())
-        .expect("erro ao iniciar o System PDV PRO");
+        .build(tauri::generate_context!())
+        .expect("erro ao iniciar o System PDV PRO")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                kill_embedded_server(app);
+            }
+        });
 }
