@@ -185,7 +185,7 @@ body.pdv-fullscreen-active .content { padding: 14px; }
 .btn {
   padding: 10px 18px; border: none; border-radius: 6px;
   cursor: pointer; font-size: 14px; font-weight: 600;
-  transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px;
+  transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
 }
 .btn-primary { background: var(--primary); color: white; }
 .btn-primary:hover { background: var(--primary-dark); }
@@ -429,9 +429,10 @@ table tr:hover td { background: #f8fafc; }
 .backup-file-btn:hover { background: #e2e8f0 !important; }
 .backup-file-nome { flex: 1; padding: 7px 12px; font-size: 13px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pdv-logo-area {
-  flex: 1; border: 2px dashed var(--border); border-radius: 10px;
+  border: 1px solid var(--border); border-radius: 10px;
   display: flex; justify-content: center; align-items: center;
-  padding: 18px; background: #f8fafc; position: relative; min-height: 240px;
+  padding: 12px; background: #f8fafc; position: relative;
+  height: 180px; margin-top: 10px;
   overflow: hidden;
 }
 .pdv-products-list { flex: 1; overflow-y: auto; border: 1px solid var(--gray-light); border-radius: 8px; }
@@ -661,11 +662,8 @@ table tr:hover td { background: #f8fafc; }
               <div id="pdvLogoPlaceholder" class="pdv-logo-placeholder">
                 <div class="pdv-logo-icon">🏪</div>
                 <p class="pdv-logo-name"><b>Logomarca da Loja</b></p>
-                <p class="pdv-logo-sub">Personalize com a sua marca</p>
-                <input type="file" id="pdvLogoUpload" accept="image/*" style="display:none" onchange="salvarLogoLoja(this)">
-                <button class="btn btn-primary btn-sm" onclick="document.getElementById('pdvLogoUpload').click()">📤 Enviar Logomarca</button>
+                <p class="pdv-logo-sub">Configure em Empresa → Logomarca</p>
               </div>
-              <button id="pdvLogoRemove" class="btn btn-sm btn-danger" style="display:none;position:absolute;top:10px;right:10px" onclick="removerLogoLoja()">🗑 Remover</button>
             </div>
           </div>
 
@@ -684,7 +682,7 @@ table tr:hover td { background: #f8fafc; }
             </div>
             <div class="pdv-cart">
               <table>
-                <thead><tr><th>Produto</th><th>Qtd <small style="font-weight:400;color:#64748b">(F4)</small></th><th>Preço</th><th>Total</th><th></th></tr></thead>
+                <thead><tr><th>Código</th><th>Produto</th><th>UN</th><th>Qtd <small style="font-weight:400;color:#64748b">(F4)</small></th><th>PR Unit</th><th>Total</th><th></th></tr></thead>
                 <tbody id="pdvCartBody"></tbody>
               </table>
             </div>
@@ -1133,7 +1131,19 @@ table tr:hover td { background: #f8fafc; }
             </div>
             <div class="form-row cols-2">
               <div><label>Mensagem no Rodapé do Cupom</label><input type="text" id="empRodape" placeholder="Ex: Volte Sempre!"></div>
-              <div><label>Logo (URL ou Base64)</label><input type="text" id="empLogo"></div>
+              <div>
+                <label>Logomarca da Empresa</label>
+                <input type="hidden" id="empLogo">
+                <div style="display:flex;align-items:center;gap:12px;margin-top:4px">
+                  <div id="empLogoPreview" style="width:120px;height:80px;border:1px solid var(--border);border-radius:8px;background:#f8fafc;display:flex;align-items:center;justify-content:center;overflow:hidden;color:#94a3b8;font-size:12px">Sem logo</div>
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <input type="file" id="empLogoUpload" accept="image/*" style="display:none" onchange="selecionarLogoEmpresa(this)">
+                    <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('empLogoUpload').click()">📤 Enviar Logo</button>
+                    <button type="button" class="btn btn-sm btn-danger" id="empLogoRemoveBtn" onclick="removerLogoEmpresa()">🗑 Remover</button>
+                  </div>
+                </div>
+                <small style="color:#64748b">Aparece automaticamente no PDV de todos os caixas (salva no servidor).</small>
+              </div>
             </div>
             <button type="button" class="btn btn-primary" onclick="salvarEmpresa()">💾 Salvar Dados</button>
           </div>
@@ -1214,7 +1224,7 @@ table tr:hover td { background: #f8fafc; }
 
           <!-- ====== OPÇÃO DE RECIBOS AUTOMÁTICOS ====== -->
           <div class="mt-20" style="border-top:2px solid #e2e8f0;padding-top:14px;margin-top:18px">
-            <h4 style="color:#1e3a8a;margin-bottom:10px">📋 Opção de Recibos Automáticos</h4>
+            <h4 style="color:#1e3a8a;margin-bottom:18px">📋 Opção de Recibos Automáticos</h4>
             <p style="color:#64748b;font-size:12px;margin-bottom:12px">
               Defina quais cupons devem ser impressos automaticamente ao finalizar
               cada operação, e quantas vias — útil para imprimir a via da loja e a
@@ -1231,7 +1241,7 @@ table tr:hover td { background: #f8fafc; }
               .recibo-card .vias-row { margin:8px 0 0 26px; display:flex; align-items:center; gap:8px; }
               .recibo-card .vias-row span { font-size:13px; color:#475569; font-weight:500; }
               .recibo-card .vias-row small { color:#64748b; }
-              .recibo-card .vias-row select { width:70px !important; }
+              .recibo-card .vias-row select { width:52px !important; text-align:center; text-align-last:center; padding-left:4px; padding-right:4px; }
               .recibo-card.full { grid-column:1 / -1; }
               .recibo-card .hint { display:block; margin:6px 0 0 26px; color:#64748b; font-size:12px; }
             </style>
@@ -1863,6 +1873,22 @@ function _handleWsMessage(msg) {
         try { carregarEmpresa(); } catch(e) {}
       }
       break;
+    case 'notify': {
+      // Servidor emite { type:'notify', entidade, ids } via /api/sql/notify.
+      const entN = msg.entidade;
+      try {
+        if (entN === 'empresa') {
+          if (typeof paginaAtual !== 'undefined' && paginaAtual === 'empresa') { try { carregarEmpresa(); } catch(e) {} }
+          try { carregarLogoLoja(); } catch(e) {}
+        } else if (entN === 'produtos') {
+          if (typeof paginaAtual !== 'undefined' && paginaAtual === 'produtos') { try { listarProdutos(); } catch(e) {} }
+          if (typeof paginaAtual !== 'undefined' && paginaAtual === 'pdv') { try { carregarPDV(); } catch(e) {} }
+        } else if (entN === 'categorias' && paginaAtual === 'categorias') { try { listarCategorias(); } catch(e) {} }
+        else if (entN === 'clientes' && paginaAtual === 'clientes') { try { listarClientes(); } catch(e) {} }
+        else if (entN === 'fornecedores' && paginaAtual === 'fornecedores') { try { listarFornecedores(); } catch(e) {} }
+      } catch(e) {}
+      break;
+    }
     case 'entidade_alterada':
       // Refresh genérico — entidade pode ser qualquer tabela.
       const ent = msg.data && msg.data.entidade;
@@ -2344,7 +2370,10 @@ function _fazerLoginCore(e) {
   // Restaura handle da pasta e inicia timer do backup agendado após o login
   (async () => {
     try {
-      if (!_backupAgendadoDirHandle) {
+      if (_pdvIsTauri()) {
+        _backupAgendadoDirPath = localStorage.getItem('pdvpro_backup_agendado_pasta_path') || _backupAgendadoDirPath;
+        _autoBackupDirPath = localStorage.getItem('pdvpro_auto_backup_pasta_path') || _autoBackupDirPath;
+      } else if (!_backupAgendadoDirHandle) {
         const handle = await _restaurarHandleIDB();
         if (handle) _backupAgendadoDirHandle = handle;
       }
@@ -2902,6 +2931,10 @@ function abrirModalCategoria(id) {
 function excluirCategoria(id) {
   confirmar('Excluir esta categoria?', () => {
     execute("DELETE FROM categorias WHERE id=?", [id]);
+    // Reutiliza IDs livres: ajusta o contador AUTOINCREMENT para o maior ID
+    // restante (ou zera quando a tabela fica vazia), evitando "buracos" na
+    // sequencia apos exclusoes.
+    execute("UPDATE sqlite_sequence SET seq=(SELECT IFNULL(MAX(id),0) FROM categorias) WHERE name='categorias'");
     toast('Categoria removida');
     listarCategorias();
   });
@@ -3233,7 +3266,7 @@ function adicionarAoCarrinho(id) {
 
   if (existente) existente.quantidade = qtdNoCarrinho + 1;
   else carrinho.push({
-    produto_id: id, produto_nome: p.nome, unidade: p.unidade,
+    produto_id: id, produto_nome: p.nome, codigo: p.codigo || '', unidade: p.unidade,
     preco_unitario: p.preco_venda, quantidade: 1, desconto: 0
   });
   // Limpa a barra de pesquisa e esconde os resultados
@@ -3244,47 +3277,22 @@ function adicionarAoCarrinho(id) {
 }
 
 // =============== LOGOMARCA DA LOJA (PDV) ===============
+// A logomarca fica salva no servidor (tabela empresa) e aparece
+// automaticamente em todos os caixas. O PDV apenas EXIBE — o envio/remocao
+// e feito no modulo Empresa. Assim nao ha botoes visiveis no caixa.
 function carregarLogoLoja() {
-  const logo = localStorage.getItem('pdvpro_logo_loja') || '';
+  let logo = '';
+  try { const e = query("SELECT logo FROM empresa WHERE id=1")[0]; logo = (e && e.logo) || ''; } catch(_) {}
   const img = document.getElementById('pdvLogoImg');
   const ph = document.getElementById('pdvLogoPlaceholder');
-  const rm = document.getElementById('pdvLogoRemove');
   if (!img) return;
   if (logo) {
     img.src = logo; img.style.display = 'block';
     if (ph) ph.style.display = 'none';
-    if (rm) rm.style.display = 'inline-flex';
   } else {
     img.removeAttribute('src'); img.style.display = 'none';
     if (ph) ph.style.display = 'block';
-    if (rm) rm.style.display = 'none';
   }
-}
-
-function salvarLogoLoja(inputEl) {
-  const file = inputEl.files && inputEl.files[0];
-  if (!file) return;
-  if (!file.type.startsWith('image/')) { toast('Selecione um arquivo de imagem', 'error'); return; }
-  const reader = new FileReader();
-  reader.onload = function(ev) {
-    try {
-      localStorage.setItem('pdvpro_logo_loja', ev.target.result);
-      carregarLogoLoja();
-      toast('Logomarca salva!', 'success');
-    } catch(e) {
-      toast('Imagem muito grande para ser salva. Tente uma menor.', 'error');
-    }
-  };
-  reader.readAsDataURL(file);
-  inputEl.value = '';
-}
-
-function removerLogoLoja() {
-  confirmar('Remover a logomarca?', () => {
-    localStorage.removeItem('pdvpro_logo_loja');
-    carregarLogoLoja();
-    toast('Logomarca removida');
-  });
 }
 
 function atualizarCarrinhoUI() {
@@ -3292,12 +3300,14 @@ function atualizarCarrinhoUI() {
   try { if (typeof salvarSessao === 'function' && usuarioLogado) salvarSessao(); } catch(e) {}
   const tb = document.getElementById('pdvCartBody');
   if (carrinho.length === 0) {
-    tb.innerHTML = '<tr><td colspan="5" class="text-center" style="padding:30px">Carrinho vazio. Adicione produtos acima.</td></tr>';
+    tb.innerHTML = '<tr><td colspan="7" class="text-center" style="padding:30px">Carrinho vazio. Adicione produtos acima.</td></tr>';
   } else {
     tb.innerHTML = carrinho.map((i, idx) => `
       <tr>
-        <td><b>${i.produto_nome}</b><br><small>${formatarMoeda(i.preco_unitario)} / ${i.unidade}</small></td>
-        <td><input type="number" class="pdv-cart-qty" data-idx="${idx}" min="1" step="1" value="${parseInt(i.quantidade) || 1}" onchange="alterarQtdCarrinho(${idx}, this.value)" onkeydown="if(['.',',','e','-','+'].includes(event.key))event.preventDefault()" style="width:70px" title="F4 — Alterar Quantidade"></td>
+        <td>${i.codigo || '-'}</td>
+        <td><b>${i.produto_nome}</b></td>
+        <td>${i.unidade || 'UN'}</td>
+        <td><input type="number" class="pdv-cart-qty" data-idx="${idx}" min="1" step="1" value="${parseInt(i.quantidade) || 1}" onchange="alterarQtdCarrinho(${idx}, this.value)" onkeydown="if(['.',',','e','-','+'].includes(event.key))event.preventDefault()" style="width:48px;text-align:center" title="F4 — Alterar Quantidade"></td>
         <td>${formatarMoeda(i.preco_unitario)}</td>
         <td><b>${formatarMoeda(i.preco_unitario * i.quantidade)}</b></td>
         <td><button class="btn btn-sm btn-danger" onclick="removerItemCarrinho(${idx})">×</button></td>
@@ -4589,7 +4599,7 @@ function _escposCupom(vendaId, tipo, cols, vias, classe, abre) {
     feed(3);
     raw(GS, 0x56, 0x01);  // corte parcial
   }
-  if (abre) raw(ESC, 0x70, 0x00, 0x19, 0xFA);  // pulso de gaveta
+  if (abre) { raw(ESC, 0x70, 0x00, 0x19, 0xFA); raw(ESC, 0x70, 0x01, 0x19, 0xFA); }  // pulso de gaveta (pino 2 e pino 5 p/ compatibilidade)
   return out;
 }
 
@@ -4766,9 +4776,11 @@ function listarVendas() {
       <td>${v.forma_pagamento || '-'}</td>
       <td><span class="badge badge-${bd}">${v.status}</span></td>
       <td>
+        <div style="display:flex;gap:6px;flex-wrap:nowrap;align-items:center">
         <button class="btn btn-sm btn-info" onclick="verDetalhesVenda(${v.id})" title="Ver detalhes">👁</button>
         <button class="btn btn-sm btn-primary" onclick="imprimirCupom(${v.id},'${v.tipo_cupom || 'nao_fiscal'}')" title="Reimprimir">🖨</button>
         ${v.status==='finalizada' ? `<button class="btn btn-sm btn-danger" onclick="cancelarVenda(${v.id})" title="Cancelar">✖</button>` : ''}
+        </div>
       </td>
     </tr>`;
   });
@@ -7254,6 +7266,40 @@ function carregarEmpresa() {
   document.getElementById('empEndereco').value = e.endereco || '';
   document.getElementById('empRodape').value = e.rodape || '';
   document.getElementById('empLogo').value = e.logo || '';
+  _empLogoAtualizarPreview();
+}
+
+function _empLogoAtualizarPreview() {
+  const el = document.getElementById('empLogo');
+  if (!el) return;
+  const v = el.value || '';
+  const prev = document.getElementById('empLogoPreview');
+  const rmBtn = document.getElementById('empLogoRemoveBtn');
+  if (prev) {
+    if (v) prev.innerHTML = '<img src="' + v + '" style="max-width:100%;max-height:100%;object-fit:contain">';
+    else prev.textContent = 'Sem logo';
+  }
+  if (rmBtn) rmBtn.style.display = v ? 'inline-flex' : 'none';
+}
+
+function selecionarLogoEmpresa(inputEl) {
+  const file = inputEl.files && inputEl.files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { toast('Selecione um arquivo de imagem', 'error'); return; }
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    document.getElementById('empLogo').value = ev.target.result;
+    _empLogoAtualizarPreview();
+    toast('Logo carregada. Clique em "Salvar Dados" para aplicar.', 'info');
+  };
+  reader.readAsDataURL(file);
+  inputEl.value = '';
+}
+
+function removerLogoEmpresa() {
+  document.getElementById('empLogo').value = '';
+  _empLogoAtualizarPreview();
+  toast('Logo removida. Clique em "Salvar Dados" para aplicar.', 'info');
 }
 
 function salvarEmpresa() {
@@ -7273,6 +7319,8 @@ function salvarEmpresa() {
     ];
     execute(`UPDATE empresa SET razao_social=?, nome_fantasia=?, cnpj=?, ie=?, endereco=?,
       telefone=?, email=?, logo=?, rodape=? WHERE id=1`, d);
+    try { _sqlNotify('empresa', [1]); } catch(_) {}
+    try { carregarLogoLoja(); } catch(_) {}
     toast('Dados da empresa salvos com sucesso!', 'success');
   } catch(err) {
     toast('Erro ao salvar dados: ' + (err.message || err), 'error');
@@ -7619,7 +7667,11 @@ function atualizarInfoBackup() {
   }
   const nomePasta = document.getElementById('autoBackupPastaNome');
   if (nomePasta) {
-    if (autoBackupDirHandle) {
+    if (_pdvIsTauri()) {
+      const p = localStorage.getItem('pdvpro_auto_backup_pasta_path');
+      if (p) _autoBackupDirPath = p;
+      nomePasta.textContent = p ? p + ' (selecionada)' : 'nenhuma (baixa na pasta padrão)';
+    } else if (autoBackupDirHandle) {
       nomePasta.textContent = autoBackupDirHandle.name + ' (selecionada)';
     } else {
       const nomeSalvo = localStorage.getItem('pdvpro_auto_backup_pasta_nome');
@@ -7634,6 +7686,18 @@ function atualizarInfoBackup() {
 let autoBackupDirHandle = null;
 
 async function selecionarPastaBackup() {
+  if (_pdvIsTauri()) {
+    const p = await _pdvEscolherPasta();
+    if (!p) return;
+    _autoBackupDirPath = p;
+    localStorage.setItem('pdvpro_auto_backup_pasta_path', p);
+    localStorage.setItem('pdvpro_auto_backup_pasta_nome', p);
+    localStorage.setItem('pdvpro_auto_backup_ativo', '1');
+    const cb = document.getElementById('autoBackupAtivo'); if (cb) cb.checked = true;
+    toast('Pasta selecionada. Backup automático ativado.', 'success');
+    atualizarInfoBackup();
+    return;
+  }
   if (!window.showDirectoryPicker) {
     toast('Seu navegador não suporta seleção de pasta. Use Chrome/Edge recente.', 'warning');
     return;
@@ -7696,7 +7760,10 @@ async function executarBackupAutomatico(silencioso = false) {
     const nomeArq = 'pdv_pro_backup_' + ts + '.db';
     const blob = new Blob([data], { type: 'application/x-sqlite3' });
 
-    if (autoBackupDirHandle) {
+    if (_pdvIsTauri() && _autoBackupDirPath) {
+      if (!silencioso) mostrarProgressoBackup('Salvando na pasta selecionada...', 75);
+      await _pdvGravarArquivoNativo(_autoBackupDirPath, nomeArq, data);
+    } else if (autoBackupDirHandle) {
       if (!silencioso) mostrarProgressoBackup('Salvando na pasta selecionada...', 75);
       const fileHandle = await autoBackupDirHandle.getFileHandle(nomeArq, { create: true });
       const writable = await fileHandle.createWritable();
@@ -7794,6 +7861,27 @@ let _backupAgendadoTimer = null;
 let _backupAgendadoUltimaData = null; // evita disparar 2x no mesmo dia
 let _backupAgendadoDirHandle = null;  // handle da pasta selecionada
 
+// ===== Backup nativo (Tauri): grava usando um CAMINHO de pasta + comando
+// nativo de gravacao, sem a API File System Access do navegador — que no
+// WebView do Tauri exibia prompts de permissao ("permitir exibir/copiar
+// arquivos") a cada backup. No navegador comum, mantem o comportamento antigo.
+let _autoBackupDirPath = (function(){ try { return localStorage.getItem('pdvpro_auto_backup_pasta_path') || null; } catch(_) { return null; } })();
+let _backupAgendadoDirPath = (function(){ try { return localStorage.getItem('pdvpro_backup_agendado_pasta_path') || null; } catch(_) { return null; } })();
+
+async function _pdvEscolherPasta() {
+  try {
+    const sel = await _pdvInvoke('plugin:dialog|open', { options: { directory: true, multiple: false, recursive: false, title: 'Escolha a pasta de backup' } });
+    if (!sel) return null;
+    if (typeof sel === 'string') return sel;
+    if (Array.isArray(sel)) return sel.length ? (sel[0].path || sel[0]) : null;
+    return sel.path || null;
+  } catch(e) { console.warn('pick folder:', e); return null; }
+}
+
+async function _pdvGravarArquivoNativo(dir, filename, uint8) {
+  return _pdvInvoke('save_file_bytes', { dir: dir, filename: filename, data: Array.from(uint8) });
+}
+
 function salvarBackupAgendado() {
   const ativo = (document.getElementById('backupAgendadoAtivo') || {}).checked ? '1' : '0';
   const horario = (document.getElementById('backupAgendadoHorario') || {}).value || '23:30';
@@ -7852,6 +7940,17 @@ async function _restaurarHandleIDB() {
 }
 
 async function selecionarPastaBackupAgendado() {
+  if (_pdvIsTauri()) {
+    const p = await _pdvEscolherPasta();
+    if (!p) return;
+    _backupAgendadoDirPath = p;
+    localStorage.setItem('pdvpro_backup_agendado_pasta_path', p);
+    localStorage.setItem('pdvpro_backup_agendado_pasta_nome', p);
+    const el = document.getElementById('backupAgendadoPastaNome');
+    if (el) el.textContent = p + ' (selecionada)';
+    toast('Pasta selecionada.', 'success');
+    return;
+  }
   if (!window.showDirectoryPicker) {
     toast('Seu navegador não suporta seleção de pasta. Use Chrome/Edge recente.', 'warning');
     return;
@@ -7919,7 +8018,15 @@ async function executarBackupAgendadoManual(silencioso) {
     const blob = new Blob([data], { type: 'application/x-sqlite3' });
 
     // Tenta salvar direto na pasta se houver handle
-    if (_backupAgendadoDirHandle) {
+    if (_pdvIsTauri() && _backupAgendadoDirPath) {
+      mostrarProgressoBackup('Salvando na pasta selecionada...', 80);
+      await new Promise(r => setTimeout(r, 150));
+      try {
+        await _pdvGravarArquivoNativo(_backupAgendadoDirPath, nomeArq, data);
+      } catch(e) {
+        _salvarBlobDownload(blob, nomeArq);
+      }
+    } else if (_backupAgendadoDirHandle) {
       mostrarProgressoBackup('Salvando na pasta selecionada...', 80);
       await new Promise(r => setTimeout(r, 150));
       try {
@@ -7976,8 +8083,12 @@ async function carregarBackupAgendado() {
   if (inpHorario) inpHorario.value = horario;
   if (elUltimo) elUltimo.textContent = ultimo;
 
-  // Tenta restaurar o handle da pasta do IDB automaticamente
-  if (!_backupAgendadoDirHandle && pastaNome) {
+  // No app desktop (Tauri) usamos caminho nativo — sem prompts do navegador.
+  if (_pdvIsTauri()) {
+    const p = localStorage.getItem('pdvpro_backup_agendado_pasta_path');
+    if (p) { _backupAgendadoDirPath = p; if (elPasta) elPasta.textContent = p + ' (selecionada)'; }
+    else if (elPasta) elPasta.textContent = 'nenhuma (baixa na pasta padrão)';
+  } else if (!_backupAgendadoDirHandle && pastaNome) {
     if (elPasta) elPasta.textContent = pastaNome + ' (restaurando...)';
     const handle = await _restaurarHandleIDB();
     if (handle) {

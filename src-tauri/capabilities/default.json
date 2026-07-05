@@ -2,5 +2,5 @@
   "identifier": "default",
   "description": "Permissoes base da janela principal do System PDV PRO.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "dialog:allow-open"]
 }

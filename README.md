@@ -171,18 +171,41 @@ impressora escolhida, sem o diálogo do Windows, respeitando todo o módulo
 - **Vias / Recibos automáticos:** imprime o número de vias configurado por
   categoria (à vista / prazo / parcelamento), com corte parcial entre elas.
 - **Abertura Automática da Gaveta:** quando `Sim`, envia o pulso ESC/POS
-  (`ESC p 0 25 250`) junto com o cupom (ou sozinho, se a impressão da
-  categoria estiver desligada).
+  nos **pinos 2 e 5** (`ESC p 0 25 250` + `ESC p 1 25 250`) junto com o cupom
+  (ou sozinho, se a impressão da categoria estiver desligada). A gaveta abre
+  no pino que estiver conectado; o outro pulso é ignorado.
 - **Acentuação:** o texto é codificado em **CP850** (`ESC t 2`); caracteres
   fora da tabela caem para ASCII sem acento, nunca quebrando a impressão.
 
 No **navegador** (sem Tauri) ou com papel **A4**, mantém-se o fluxo anterior
 (diálogo de impressão via iframe), também respeitando vias e largura.
 
+### Compatibilidade de impressoras térmicas
+
+O sistema é compatível com **qualquer impressora térmica ESC/POS** — o padrão
+de fato do mercado, usado por **Bematech, Elgin, Epson, Daruma, Sweda, Tanca,
+Control iD**, entre outras. O funcionamento não depende da marca, e sim de:
+
+1. O **driver da impressora instalado no Windows** (ela precisa aparecer em
+   *Dispositivos e Impressoras*). O seletor lista automaticamente o que o
+   Windows conhece.
+2. A impressora **aceitar dados RAW/ESC/POS** — praticamente todas as térmicas
+   de cupom aceitam. Enviamos os bytes diretamente pelo spooler em modo RAW,
+   sem passar por conversão de driver.
+
+Recomendações por marca (todas ESC/POS, funcionam sem ajuste):
+- **Bematech** (MP-4200 TH, MP-2800 TH…): 80/58 mm, gaveta nos pinos 2/5 — OK.
+- **Elgin** (i9, i7, i8): 80/58 mm, CP850 — OK.
+- **Epson** (TM-T20, TM-T88): referência ESC/POS — OK.
+- **Daruma / Sweda / Tanca / Control iD**: ESC/POS padrão — OK.
+
+Se uma impressora específica usar uma tabela de código diferente (acentos
+estranhos) ou um comando de gaveta proprietário, o ajuste é pontual em
+`src-tauri/src/printing.rs` (gaveta) e na função `_escposCupom` do `app.html`
+(tabela de código). Nesse caso, informe **marca + modelo**.
+
 > Comandos Tauri usados: `list_printers`, `print_raw(printer, data)` e
 > `open_drawer(printer)` — implementados em `src-tauri/src/printing.rs`.
-> A maioria das impressoras térmicas é compatível com ESC/POS; se a sua usar
-> outra tabela de código/gaveta, ajuste em `printing.rs` / `_escposCupom`.
 
 ---
 

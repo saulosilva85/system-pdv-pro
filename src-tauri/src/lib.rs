@@ -234,6 +234,23 @@ fn open_drawer(printer: String) -> Result<(), String> {
     printing::imp::open_drawer(&printer)
 }
 
+// Grava bytes (ex.: backup .db) numa pasta escolhida pelo usuario, usando o
+// sistema de arquivos nativo. Evita a API File System Access do navegador,
+// que no WebView exibe prompts de permissao a cada gravacao.
+#[tauri::command]
+fn save_file_bytes(dir: String, filename: String, data: Vec<u8>) -> Result<String, String> {
+    let d = PathBuf::from(&dir);
+    fs::create_dir_all(&d).map_err(|e| format!("criar pasta '{}': {}", dir, e))?;
+    // Sanitiza o nome do arquivo (sem separadores de caminho).
+    let safe: String = filename
+        .chars()
+        .map(|c| if c == '/' || c == '\\' { '_' } else { c })
+        .collect();
+    let full = d.join(&safe);
+    fs::write(&full, &data).map_err(|e| format!("gravar '{}': {}", full.display(), e))?;
+    Ok(full.to_string_lossy().to_string())
+}
+
 #[tauri::command]
 fn read_server_log_tail(app: AppHandle) -> String {
     let p = log_path(&app);
@@ -264,6 +281,7 @@ fn kill_embedded_server(app: &AppHandle) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(ServerState::default())
         .setup(|app| {
             // Garante que a janela principal abra visivel, restaurada (nao
@@ -286,7 +304,8 @@ pub fn run() {
             read_server_log_tail,
             list_printers,
             print_raw,
-            open_drawer
+            open_drawer,
+            save_file_bytes
         ])
         .build(tauri::generate_context!())
         .expect("erro ao iniciar o System PDV PRO")

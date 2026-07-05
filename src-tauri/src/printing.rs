@@ -102,9 +102,15 @@ pub mod imp {
         }
     }
 
-    // Comando padrão de abertura de gaveta (pulso no pino 2): ESC p 0 25 250.
+    // Abertura de gaveta ESC/POS. A maioria das gavetas usa o pino 2, mas
+    // algumas (dependendo do cabo/modelo — Bematech/Elgin/Epson) usam o pino
+    // 5. Enviamos os dois pulsos: a gaveta so abre no pino conectado, o outro
+    // e ignorado — garantindo compatibilidade entre marcas.
     pub fn open_drawer(printer: &str) -> Result<(), String> {
-        let kick: [u8; 5] = [0x1B, 0x70, 0x00, 0x19, 0xFA];
+        let kick: [u8; 10] = [
+            0x1B, 0x70, 0x00, 0x19, 0xFA, // ESC p 0 25 250 -> pino 2
+            0x1B, 0x70, 0x01, 0x19, 0xFA, // ESC p 1 25 250 -> pino 5
+        ];
         print_raw(printer, &kick)
     }
 }
