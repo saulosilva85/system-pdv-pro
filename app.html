@@ -3285,12 +3285,19 @@ function carregarLogoLoja() {
   try { const e = query("SELECT logo FROM empresa WHERE id=1")[0]; logo = (e && e.logo) || ''; } catch(_) {}
   const img = document.getElementById('pdvLogoImg');
   const ph = document.getElementById('pdvLogoPlaceholder');
-  if (!img) return;
+  const area = document.getElementById('pdvLogoArea');
+  if (!area) return;
   if (logo) {
-    img.src = logo; img.style.display = 'block';
+    area.style.backgroundImage = 'url("' + logo + '")';
+    area.style.backgroundSize = 'contain';
+    area.style.backgroundRepeat = 'no-repeat';
+    area.style.backgroundPosition = 'center';
+    area.style.backgroundOrigin = 'content-box';
+    if (img) { img.removeAttribute('src'); img.style.display = 'none'; }
     if (ph) ph.style.display = 'none';
   } else {
-    img.removeAttribute('src'); img.style.display = 'none';
+    area.style.backgroundImage = 'none';
+    if (img) { img.removeAttribute('src'); img.style.display = 'none'; }
     if (ph) ph.style.display = 'block';
   }
 }
