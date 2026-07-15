@@ -6,9 +6,11 @@
 
 use std::fs;
 use std::io::{BufRead, BufReader};
+use std::net::{SocketAddr, TcpStream};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
+use std::time::Duration;
 
 use serde_json::{Map, Value};
 use tauri::{AppHandle, Manager, State};
@@ -171,7 +173,14 @@ fn hostname() -> String {
 
 #[tauri::command]
 fn start_embedded_server(app: AppHandle, state: State<ServerState>) -> Result<(), String> {
-    // Idempotente: se ja iniciamos e o processo segue vivo, nao reinicia.
+    // O servidor continua em segundo plano quando a janela do Servidor fecha.
+    // Ao reabrir o app, reutiliza o processo que ja atende a porta da rede.
+    let addr = SocketAddr::from(([127, 0, 0, 1], 8765));
+    if TcpStream::connect_timeout(&addr, Duration::from_millis(300)).is_ok() {
+        return Ok(());
+    }
+
+    // Idempotente dentro desta mesma instancia do desktop.
     {
         let mut guard = state.child.lock().unwrap();
         if let Some(child) = guard.as_mut() {
@@ -211,9 +220,13 @@ fn start_embedded_server(app: AppHandle, state: State<ServerState>) -> Result<()
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
 
-    let child = cmd
-        .spawn()
-        .map_err(|e| format!("falha ao iniciar o servidor ({}): {}", node_bin.display(), e))?;
+    let child = cmd.spawn().map_err(|e| {
+        format!(
+            "falha ao iniciar o servidor ({}): {}",
+            node_bin.display(),
+            e
+        )
+    })?;
 
     *state.child.lock().unwrap() = Some(child);
     Ok(())
@@ -264,20 +277,6 @@ fn read_server_log_tail(app: AppHandle) -> String {
     lines[start..].join("\n")
 }
 
-// Encerra o servidor Node embutido (se vivo). Chamado ao sair do app para
-// nao deixar um node.exe orfao travando arquivos na pasta de instalacao —
-// o que impedia o desinstalador de remover a pasta e quebrava a reinstalacao.
-fn kill_embedded_server(app: &AppHandle) {
-    if let Some(state) = app.try_state::<ServerState>() {
-        if let Ok(mut guard) = state.child.lock() {
-            if let Some(mut child) = guard.take() {
-                let _ = child.kill();
-                let _ = child.wait();
-            }
-        }
-    }
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -309,9 +308,5 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("erro ao iniciar o System PDV PRO")
-        .run(|app, event| {
-            if let tauri::RunEvent::Exit = event {
-                kill_embedded_server(app);
-            }
-        });
+        .run(|_, _| {});
 }

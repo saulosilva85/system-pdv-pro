@@ -10,10 +10,18 @@
   ; nao deixar arquivos travados. Nao matamos node.exe globalmente para nao
   ; afetar outros processos Node do usuario.
   nsExec::Exec 'taskkill /F /IM "System PDV PRO.exe" /T'
+  ; O servidor continua em segundo plano mesmo com a janela fechada. Encerra
+  ; somente o processo que estiver atendendo a porta exclusiva do PDV.
+  nsExec::ExecToLog 'powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Get-NetTCPConnection -LocalPort 8765 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $$_.OwningProcess -Force }"'
   Sleep 800
 !macroend
 
 !macro NSIS_HOOK_POSTUNINSTALL
   ; Remove a pasta de instalacao inteira (inclui arquivos criados em runtime).
   RMDir /r "$INSTDIR"
+
+  ; A configuracao pertence a esta instalacao/máquina e deve voltar zerada
+  ; depois de desinstalar. O banco em AppData permanece preservado.
+  Delete "$APPDATA\com.systempdvpro.app\config.json"
+  Delete "$LOCALAPPDATA\com.systempdvpro.app\config.json"
 !macroend
