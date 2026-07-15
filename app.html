@@ -1204,13 +1204,11 @@ table tr:hover td { background: #f8fafc; }
                 <select id="cfgPrinterName" style="flex:1">
                   <option value="">-- Selecione --</option>
                 </select>
-                <button type="button" class="btn btn-sm btn-success" onclick="adicionarImpressoraSalva()" title="Adicionar nova impressora à lista">➕</button>
-                <button type="button" class="btn btn-sm btn-danger" onclick="removerImpressoraSalva()" title="Remover impressora selecionada">🗑️</button>
+                <button type="button" class="btn btn-sm btn-primary" onclick="_carregarImpressorasReais()" title="Atualizar impressoras instaladas no Windows">↻</button>
               </div>
               <small style="color:#64748b">
-                Dica: imprima qualquer cupom uma vez (Ctrl+P ou botão Imprimir), veja
-                o nome exato da impressora na janela do Windows e clique em ➕
-                para adicioná-la à lista. Ela ficará disponível aqui permanentemente.
+                A lista é atualizada diretamente pelas impressoras instaladas no Windows.
+                Clique em ↻ após instalar ou desinstalar uma impressora.
               </small>
             </div>
             <div>
@@ -4617,22 +4615,37 @@ function _imprimirCupomNativo(vendaId, tipo, vias, classe, pw, printer, abre) {
   return _pdvInvoke('print_raw', { printer: printer, data: bytes });
 }
 
-// Carrega as impressoras reais instaladas no Windows (uma vez) e mescla na
-// lista do dropdown, persistindo-as.
-var _impressorasReaisCarregadas = false;
+// No desktop, o Windows é a fonte de verdade. A lista é consultada novamente
+// sempre que o módulo abre ou o usuário clica em atualizar; nomes removidos do
+// spooler não permanecem no dropdown nem no cache local.
+var _impressorasReais = [];
+var _consultaImpressoras = 0;
 function _carregarImpressorasReais() {
-  if (_impressorasReaisCarregadas || !_pdvIsTauri()) return;
-  _impressorasReaisCarregadas = true;
-  _pdvInvoke('list_printers').then(function (reais) {
-    if (!Array.isArray(reais) || !reais.length) return;
-    var salvas = _getImpressorasSalvas();
-    var changed = false;
-    reais.forEach(function (n) {
-      if (n && salvas.indexOf(n) < 0 && IMPRESSORAS_PADRAO.indexOf(n) < 0) { salvas.push(n); changed = true; }
-    });
-    if (changed) _setImpressorasSalvas(salvas);
-    preencherDropdownImpressoras();
-  }).catch(function (e) { console.warn('list_printers:', e); });
+  if (!_pdvIsTauri()) { preencherDropdownImpressoras(); return Promise.resolve([]); }
+  var consulta = ++_consultaImpressoras;
+  var sel = document.getElementById('cfgPrinterName');
+  if (sel) {
+    sel.disabled = true;
+    sel.innerHTML = '<option value="">Atualizando impressoras...</option>';
+  }
+  return _pdvInvoke('list_printers').then(function (reais) {
+    if (consulta !== _consultaImpressoras) return;
+    _impressorasReais = Array.from(new Set((Array.isArray(reais) ? reais : [])
+      .map(function (n) { return String(n || '').trim(); })
+      .filter(Boolean)))
+      .sort(function (a, b) { return a.localeCompare(b, 'pt-BR'); });
+    _setImpressorasSalvas(_impressorasReais);
+    var atual = getConfig('cfg_printer_name', '');
+    if (atual && _impressorasReais.indexOf(atual) < 0) {
+      setConfig('cfg_printer_name', '');
+    }
+    _renderDropdownImpressoras(_impressorasReais, false);
+  }).catch(function (e) {
+    if (consulta !== _consultaImpressoras) return;
+    console.warn('list_printers:', e);
+    _renderDropdownImpressoras([], false);
+    toast('Não foi possível atualizar as impressoras do Windows', 'warning');
+  });
 }
 
 // Ponto de entrada de impressao do cupom de venda. Usa impressao nativa quando
@@ -7393,25 +7406,31 @@ function _setImpressorasSalvas(arr) {
   catch(e) {}
 }
 
-function preencherDropdownImpressoras() {
+function _renderDropdownImpressoras(todas, manterAtualAusente) {
   const sel = document.getElementById('cfgPrinterName');
   if (!sel) return;
-  const salvas = _getImpressorasSalvas();
-  // Mescla padrões + salvas (sem duplicar)
-  const todas = [...IMPRESSORAS_PADRAO];
-  salvas.forEach(n => { if (n && !todas.includes(n)) todas.push(n); });
   const atual = getConfig('cfg_printer_name', '');
   let html = '<option value="">-- Selecione --</option>';
   todas.forEach(n => {
-    const sel = (n === atual) ? ' selected' : '';
-    html += `<option value="${n.replace(/"/g,'&quot;')}"${sel}>${n}</option>`;
+    const selecionada = (n === atual) ? ' selected' : '';
+    html += `<option value="${n.replace(/"/g,'&quot;')}"${selecionada}>${n}</option>`;
   });
-  // Se o valor salvo não estiver na lista (caso antigo), adiciona como item extra
-  if (atual && !todas.includes(atual)) {
+  if (manterAtualAusente && atual && !todas.includes(atual)) {
     html += `<option value="${atual.replace(/"/g,'&quot;')}" selected>${atual}</option>`;
   }
   sel.innerHTML = html;
-  _carregarImpressorasReais();
+  sel.disabled = false;
+}
+
+function preencherDropdownImpressoras() {
+  if (_pdvIsTauri()) {
+    _carregarImpressorasReais();
+    return;
+  }
+  const salvas = _getImpressorasSalvas();
+  const todas = [...IMPRESSORAS_PADRAO];
+  salvas.forEach(n => { if (n && !todas.includes(n)) todas.push(n); });
+  _renderDropdownImpressoras(todas, true);
 }
 
 function adicionarImpressoraSalva() {
