@@ -5,6 +5,14 @@
 ; pasta ficavam para tras em "C:\Program Files\System PDV PRO", o que gerava
 ; erro ao reinstalar. Aqui forcamos a remocao completa da pasta.
 
+!macro NSIS_HOOK_POSTINSTALL
+  ; Toda instalacao deve iniciar com a escolha do modo desta maquina. Isso
+  ; tambem limpa configuracoes deixadas por desinstaladores de versoes antigas.
+  ; O banco de dados permanece preservado em AppData.
+  Delete "$APPDATA\com.systempdvpro.app\config.json"
+  Delete "$LOCALAPPDATA\com.systempdvpro.app\config.json"
+!macroend
+
 !macro NSIS_HOOK_PREUNINSTALL
   ; Encerra o app (e, via /T, o servidor Node filho) caso esteja aberto, para
   ; nao deixar arquivos travados. Nao matamos node.exe globalmente para nao
