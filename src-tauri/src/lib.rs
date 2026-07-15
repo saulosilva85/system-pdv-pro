@@ -34,6 +34,36 @@ fn config_path(app: &AppHandle) -> PathBuf {
     dir.join("config.json")
 }
 
+fn sync_installation_config(app: &AppHandle) -> Result<(), String> {
+    let marker = std::env::current_exe()
+        .map_err(|e| e.to_string())?
+        .parent()
+        .map(|dir| dir.join("install-stamp.txt"));
+    let Some(marker) = marker else {
+        return Ok(());
+    };
+    let stamp = match fs::read(&marker) {
+        Ok(value) => value,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(e.to_string()),
+    };
+
+    let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
+    let seen_path = config_dir.join("install-stamp.txt");
+    if fs::read(&seen_path).ok().as_deref() == Some(stamp.as_slice()) {
+        return Ok(());
+    }
+
+    let config = config_dir.join("config.json");
+    match fs::remove_file(config) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e.to_string()),
+    }
+    fs::write(seen_path, stamp).map_err(|e| e.to_string())
+}
+
 fn data_dir(app: &AppHandle) -> PathBuf {
     let dir = app
         .path()
@@ -283,6 +313,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(ServerState::default())
         .setup(|app| {
+            let _ = sync_installation_config(app.handle());
+
             // Garante que a janela principal abra visivel, restaurada (nao
             // minimizada), maximizada e em foco — ao ser iniciada pela tela
             // final do instalador ela vinha minimizada/sem foco.

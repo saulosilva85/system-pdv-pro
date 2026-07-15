@@ -1,5 +1,6 @@
 ; Hooks NSIS do System PDV PRO
 ; ---------------------------------------------------------------------------
+!include "FileFunc.nsh"
 ; Tauri/NSIS so remove os arquivos que ele mesmo instalou. Arquivos criados
 ; em tempo de execucao (logs, node_modules descompactado, etc.) e a propria
 ; pasta ficavam para tras em "C:\Program Files\System PDV PRO", o que gerava
@@ -11,6 +12,13 @@
   ; O banco de dados permanece preservado em AppData.
   Delete "$APPDATA\com.systempdvpro.app\config.json"
   Delete "$LOCALAPPDATA\com.systempdvpro.app\config.json"
+
+  ; Marca esta execucao do instalador. O app compara este valor no primeiro
+  ; inicio de cada usuario, evitando que a elevacao UAC limpe o perfil errado.
+  ${GetTime} "" "L" $0 $1 $2 $3 $4 $5 $6
+  FileOpen $7 "$INSTDIR\install-stamp.txt" w
+  FileWrite $7 "$2-$1-$0 $4:$5:$6"
+  FileClose $7
 !macroend
 
 !macro NSIS_HOOK_PREUNINSTALL
