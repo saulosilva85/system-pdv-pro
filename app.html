@@ -1135,12 +1135,12 @@ table tr:hover td { background: #f8fafc; }
                 <label>Logomarca da Empresa</label>
                 <input type="hidden" id="empLogo">
                 <div style="display:flex;align-items:center;gap:12px;margin-top:4px">
-                  <div id="empLogoPreview" style="width:120px;height:80px;border:1px solid var(--border);border-radius:8px;background:#f8fafc;display:flex;align-items:center;justify-content:center;overflow:hidden;color:#94a3b8;font-size:12px">Sem logo</div>
                   <div style="display:flex;flex-direction:column;gap:6px">
-                    <input type="file" id="empLogoUpload" accept="image/*" style="display:none" onchange="selecionarLogoEmpresa(this)">
+                    <input type="file" id="empLogoUpload" accept="image/*" style="display:none !important" onchange="selecionarLogoEmpresa(this)">
                     <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('empLogoUpload').click()">📁 Escolher Arquivo</button>
                     <button type="button" class="btn btn-sm btn-danger" id="empLogoRemoveBtn" onclick="removerLogoEmpresa()">🗑 Remover</button>
                   </div>
+                  <div id="empLogoPreview" style="width:120px;height:80px;border:1px solid var(--border);border-radius:8px;background:#f8fafc;display:flex;align-items:center;justify-content:center;overflow:hidden;color:#94a3b8;font-size:12px">Sem logo</div>
                 </div>
                 <small style="color:#64748b">Aparece automaticamente no PDV de todos os caixas (salva no servidor).</small>
               </div>

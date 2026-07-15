@@ -7,13 +7,35 @@ pub mod imp {
     use windows::core::{PCWSTR, PWSTR};
     use windows::Win32::Foundation::HANDLE;
     use windows::Win32::Graphics::Printing::{
-        ClosePrinter, EndDocPrinter, EndPagePrinter, EnumPrintersW, OpenPrinterW,
-        StartDocPrinterW, StartPagePrinter, WritePrinter, DOC_INFO_1W, PRINTER_ENUM_CONNECTIONS,
-        PRINTER_ENUM_LOCAL, PRINTER_INFO_4W,
+        ClosePrinter, EndDocPrinter, EndPagePrinter, EnumPrintersW, GetPrinterDriverW,
+        OpenPrinterW, StartDocPrinterW, StartPagePrinter, WritePrinter, DOC_INFO_1W,
+        PRINTER_ATTRIBUTE_HIDDEN, PRINTER_ENUM_CONNECTIONS, PRINTER_ENUM_LOCAL, PRINTER_INFO_4W,
     };
 
     fn wide(s: &str) -> Vec<u16> {
         s.encode_utf16().chain(std::iter::once(0)).collect()
+    }
+
+    fn has_installed_driver(name: &str) -> bool {
+        unsafe {
+            let pname = wide(name);
+            let mut hprinter = HANDLE::default();
+            if OpenPrinterW(PCWSTR(pname.as_ptr()), &mut hprinter, None).is_err() {
+                return false;
+            }
+
+            let mut needed: u32 = 0;
+            let _ = GetPrinterDriverW(hprinter, PCWSTR::null(), 2, None, &mut needed);
+            let available = if needed == 0 {
+                false
+            } else {
+                let mut buffer = vec![0u8; needed as usize];
+                GetPrinterDriverW(hprinter, PCWSTR::null(), 2, Some(&mut buffer), &mut needed)
+                    .as_bool()
+            };
+            let _ = ClosePrinter(hprinter);
+            available
+        }
     }
 
     pub fn list_printers() -> Result<Vec<String>, String> {
@@ -37,15 +59,18 @@ pub mod imp {
             )
             .map_err(|e| e.to_string())?;
 
-            let infos =
-                std::slice::from_raw_parts(buf.as_ptr() as *const PRINTER_INFO_4W, returned as usize);
+            let infos = std::slice::from_raw_parts(
+                buf.as_ptr() as *const PRINTER_INFO_4W,
+                returned as usize,
+            );
             let mut names = Vec::with_capacity(returned as usize);
             for info in infos {
-                if !info.pPrinterName.is_null() {
-                    if let Ok(name) = info.pPrinterName.to_string() {
-                        if !name.is_empty() {
-                            names.push(name);
-                        }
+                if info.Attributes & PRINTER_ATTRIBUTE_HIDDEN != 0 || info.pPrinterName.is_null() {
+                    continue;
+                }
+                if let Ok(name) = info.pPrinterName.to_string() {
+                    if !name.is_empty() && has_installed_driver(&name) {
+                        names.push(name);
                     }
                 }
             }
