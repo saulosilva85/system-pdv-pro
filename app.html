@@ -2930,10 +2930,9 @@ function abrirModalCategoria(id) {
 function excluirCategoria(id) {
   confirmar('Excluir esta categoria?', () => {
     execute("DELETE FROM categorias WHERE id=?", [id]);
-    // Reutiliza IDs livres: ajusta o contador AUTOINCREMENT para o maior ID
-    // restante (ou zera quando a tabela fica vazia), evitando "buracos" na
-    // sequencia apos exclusoes.
-    execute("UPDATE sqlite_sequence SET seq=(SELECT IFNULL(MAX(id),0) FROM categorias) WHERE name='categorias'");
+    if (query("SELECT COUNT(*) AS total FROM categorias")[0].total === 0) {
+      execute("DELETE FROM sqlite_sequence WHERE name='categorias'");
+    }
     toast('Categoria removida');
     listarCategorias();
   });
