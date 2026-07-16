@@ -1139,7 +1139,7 @@ table tr:hover td { background: #f8fafc; }
                     <button type="button" class="btn btn-sm btn-primary" onclick="escolherLogoEmpresa()">📁 Escolher Arquivo</button>
                     <button type="button" class="btn btn-sm btn-danger" id="empLogoRemoveBtn" onclick="removerLogoEmpresa()">🗑 Remover</button>
                   </div>
-                  <div id="empLogoPreview" style="width:120px;height:80px;border:1px solid var(--border);border-radius:8px;background:#f8fafc;display:flex;align-items:center;justify-content:center;overflow:hidden;color:#94a3b8;font-size:12px">Sem logo</div>
+                  <div id="empLogoPreview" style="width:120px;height:80px;border:1px solid var(--border);border-radius:8px;background:#f8fafc;display:flex;align-items:center;justify-content:center;overflow:hidden;color:#94a3b8;font-size:12px"></div>
                 </div>
                 <small style="color:#64748b">Aparece automaticamente no PDV de todos os caixas (salva no servidor).</small>
               </div>
@@ -7296,7 +7296,7 @@ function _empLogoAtualizarPreview() {
   const rmBtn = document.getElementById('empLogoRemoveBtn');
   if (prev) {
     if (v) prev.innerHTML = '<img src="' + v + '" style="max-width:100%;max-height:100%;object-fit:contain">';
-    else prev.textContent = 'Sem logo';
+    else prev.textContent = '';
   }
   if (rmBtn) rmBtn.style.display = v ? 'inline-flex' : 'none';
 }
