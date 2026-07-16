@@ -4,78 +4,43 @@
 
 #[cfg(windows)]
 pub mod imp {
+    use std::os::windows::process::CommandExt;
+    use std::process::Command;
     use windows::core::{PCWSTR, PWSTR};
     use windows::Win32::Foundation::HANDLE;
     use windows::Win32::Graphics::Printing::{
-        ClosePrinter, EndDocPrinter, EndPagePrinter, EnumPrintersW, GetPrinterDriverW,
-        OpenPrinterW, StartDocPrinterW, StartPagePrinter, WritePrinter, DOC_INFO_1W,
-        PRINTER_ATTRIBUTE_HIDDEN, PRINTER_ENUM_CONNECTIONS, PRINTER_ENUM_LOCAL, PRINTER_INFO_4W,
+        ClosePrinter, EndDocPrinter, EndPagePrinter, OpenPrinterW, StartDocPrinterW,
+        StartPagePrinter, WritePrinter, DOC_INFO_1W,
     };
 
     fn wide(s: &str) -> Vec<u16> {
         s.encode_utf16().chain(std::iter::once(0)).collect()
     }
 
-    fn has_installed_driver(name: &str) -> bool {
-        unsafe {
-            let pname = wide(name);
-            let mut hprinter = HANDLE::default();
-            if OpenPrinterW(PCWSTR(pname.as_ptr()), &mut hprinter, None).is_err() {
-                return false;
-            }
-
-            let mut needed: u32 = 0;
-            let _ = GetPrinterDriverW(hprinter, PCWSTR::null(), 2, None, &mut needed);
-            let available = if needed == 0 {
-                false
-            } else {
-                let mut buffer = vec![0u8; needed as usize];
-                GetPrinterDriverW(hprinter, PCWSTR::null(), 2, Some(&mut buffer), &mut needed)
-                    .as_bool()
-            };
-            let _ = ClosePrinter(hprinter);
-            available
-        }
-    }
-
     pub fn list_printers() -> Result<Vec<String>, String> {
-        unsafe {
-            let flags = PRINTER_ENUM_LOCAL | PRINTER_ENUM_CONNECTIONS;
-            let mut needed: u32 = 0;
-            let mut returned: u32 = 0;
-            // 1ª chamada: descobre o tamanho do buffer.
-            let _ = EnumPrintersW(flags, PCWSTR::null(), 4, None, &mut needed, &mut returned);
-            if needed == 0 {
-                return Ok(vec![]);
-            }
-            let mut buf = vec![0u8; needed as usize];
-            EnumPrintersW(
-                flags,
-                PCWSTR::null(),
-                4,
-                Some(&mut buf),
-                &mut needed,
-                &mut returned,
-            )
-            .map_err(|e| e.to_string())?;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let script = "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Get-PnpDevice -Class PrintQueue -PresentOnly -Status OK -ErrorAction Stop | ForEach-Object { $_.FriendlyName }";
+        let output = Command::new("powershell.exe")
+            .args(["-NoProfile", "-NonInteractive", "-Command", script])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .map_err(|e| format!("falha ao consultar impressoras do Windows: {e}"))?;
 
-            let infos = std::slice::from_raw_parts(
-                buf.as_ptr() as *const PRINTER_INFO_4W,
-                returned as usize,
-            );
-            let mut names = Vec::with_capacity(returned as usize);
-            for info in infos {
-                if info.Attributes & PRINTER_ATTRIBUTE_HIDDEN != 0 || info.pPrinterName.is_null() {
-                    continue;
-                }
-                if let Ok(name) = info.pPrinterName.to_string() {
-                    if !name.is_empty() && has_installed_driver(&name) {
-                        names.push(name);
-                    }
-                }
-            }
-            Ok(names)
+        if !output.status.success() {
+            let message = String::from_utf8_lossy(&output.stderr).trim().to_string();
+            return Err(if message.is_empty() {
+                "falha ao consultar impressoras instaladas no Windows".into()
+            } else {
+                message
+            });
         }
+
+        Ok(String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .map(|name| name.trim().trim_start_matches('\u{feff}'))
+            .filter(|name| !name.is_empty())
+            .map(str::to_owned)
+            .collect())
     }
 
     pub fn print_raw(printer: &str, data: &[u8]) -> Result<(), String> {
