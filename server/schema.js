@@ -59,6 +59,12 @@ const SCHEMA_SQL = `
     CREATE TABLE IF NOT EXISTS categorias (
       id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT NOT NULL, descricao TEXT
     );
+    CREATE TRIGGER IF NOT EXISTS reset_categorias_sequence
+    AFTER DELETE ON categorias
+    WHEN NOT EXISTS (SELECT 1 FROM categorias)
+    BEGIN
+      DELETE FROM sqlite_sequence WHERE name='categorias';
+    END;
     CREATE TABLE IF NOT EXISTS produtos (
       id INTEGER PRIMARY KEY AUTOINCREMENT, codigo TEXT, codigo_barras TEXT,
       nome TEXT NOT NULL, descricao TEXT, categoria_id INTEGER,
