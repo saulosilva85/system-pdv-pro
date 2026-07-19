@@ -2887,7 +2887,7 @@ function excluirProduto(id) {
 
 // =============== CATEGORIAS ===============
 function listarCategorias() {
-  const cats = query("SELECT * FROM categorias ORDER BY nome");
+  const cats = query("SELECT * FROM categorias ORDER BY id ASC");
   let html = '';
   if (cats.length === 0) html = '<tr><td colspan="4" class="text-center">Nenhuma categoria cadastrada</td></tr>';
   else cats.forEach(c => {
